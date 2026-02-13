@@ -1,9 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from core.logger import setup_logging, get_logger
 
 app = FastAPI(
-    title="EPS API",
-    description="EPS management API",
+    title="EPS API 2",
+    description="EPS management API 2",
     version="0.1"
 )
 
@@ -17,9 +18,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+setup_logging()
+
+# Logger call example
+#logger = get_logger(__name__)
+
 @app.get("/")
 def root():
     """Root endpoint"""
+    #logger.info("Root endpoint called")
     return {
         "message": "EPS API",
         "features": [
