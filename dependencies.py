@@ -8,6 +8,7 @@ from services.repositories.DiagnosticoRepository import DiagnosticoRepository
 from services.repositories.DoctorRepository import DoctorRepository
 from services.repositories.HospitalizacionesRepository import HospitalizacionesRepository
 from services.repositories.AtencionUrgenciasRepository import AtencionUrgenciasRepository
+from services.repositories.PersonaRepository import PersonaRepository
 
 #Repositories
 def getAtencionUrgenciasRepository(db = Depends(get_db))-> AtencionUrgenciasRepository:
@@ -20,12 +21,15 @@ def getDoctorRepository(db = Depends(get_db_admin))-> DoctorRepository:
     return DoctorRepository(db)
 def getAtencionHospitalizacionesRepository(db = Depends(get_db))-> AtencionHospitalizacionesRepository:
     return AtencionHospitalizacionesRepository(db)
+def getPersonaRepository(db = Depends(get_db_admin))-> PersonaRepository:
+    return PersonaRepository(db)
 #Services
 def getHospitalizacionesService(
     hospitalizacionesRepository: HospitalizacionesRepository = Depends(getHospitalizacionesRepository),
     atencionUrgenciasRepository: AtencionUrgenciasRepository = Depends(getAtencionUrgenciasRepository),
     repoAtencionHospitalizaciones: AtencionHospitalizacionesRepository = Depends(getAtencionHospitalizacionesRepository),
     repoDiagnostico: DiagnosticoRepository = Depends(getDiagnosticosRepository),
-    repoDoctor: DoctorRepository = Depends(getDoctorRepository)
+    repoDoctor: DoctorRepository = Depends(getDoctorRepository),
+    repoPersona: PersonaRepository = Depends(getPersonaRepository)
 ):
-    return HospitalizacionesService(hospitalizacionesRepository, atencionUrgenciasRepository, repoDiagnostico, repoDoctor, repoAtencionHospitalizaciones)
+    return HospitalizacionesService(hospitalizacionesRepository, atencionUrgenciasRepository, repoDiagnostico, repoDoctor, repoAtencionHospitalizaciones,repoPersona)

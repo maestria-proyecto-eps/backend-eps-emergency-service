@@ -18,6 +18,10 @@ class AtencionHospitalizaciones(Base):
     hospitalizacion = relationship('Hospitalizaciones', back_populates='atencion_hospitalizaciones')
     diagnostico = relationship('CatalogoDiagnosticos', back_populates='atencion_hospitalizaciones')
 
+    @property
+    def nombre_enfermedad(self):
+        return self.diagnostico.nombre_diagnostico if self.diagnostico else None
+
     def __repr__(self):
         return (f"AtencionHospitalizaciones(id_atencionh={self.id_atencionh}, id_doctor={self.id_doctor}, "
                 f"fecha_atencionh={self.fecha_atencionh}, id_diagnostico={self.id_diagnostico}, "
