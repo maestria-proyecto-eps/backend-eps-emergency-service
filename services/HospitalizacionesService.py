@@ -52,15 +52,16 @@ class HospitalizacionesService:
             id_doctor=id_doctor,
             fecha_inicio=fecha_inicio,
             fecha_fin=fecha_fin,
-            id_diagnostico=id_diagnostico
+            id_diagnostico=id_diagnostico,
+            pag=pag,
+            cantidad=cantidad
         )
-        print(data)
         totalPags = math.ceil(count / cantidad)
         response = [AtencionHospitalziacionesDetailResponse.model_validate(e) for e in data]
         for r in response:
-            doctor = self.repoDoctor.get_doctor_por_id(r.id_doctor)
+            doctor = self.repoPersona.get_persona_por_id(r.id_doctor)
             if doctor:
-                r.nombre_doctor = doctor.nombre
+                r.nombre_doctor = doctor.nombres + " " + doctor.apellidos
             r.nombre_paciente = nombrePaciente
         return Response.ok(PaginatedResponse[AtencionHospitalziacionesDetailResponse](
             data=response, 

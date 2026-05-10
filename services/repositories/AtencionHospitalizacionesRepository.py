@@ -25,7 +25,7 @@ class AtencionHospitalizacionesRepository:
         query = self.db.query(AtencionHospitalizaciones)
         query = query.join(Hospitalizaciones, AtencionHospitalizaciones.hospitalizacion)
         query = query.join(AtencionUrgencias, Hospitalizaciones.urgencia)
-        query = query.join(CatalogoDiagnosticos, AtencionUrgencias.diagnostico)
+        query = query.join(CatalogoDiagnosticos, AtencionHospitalizaciones.diagnostico)
         query = query.join(Triages, AtencionUrgencias.triage)
         query = query.filter(AtencionHospitalizaciones.id_hospitalizacion == id_hospitalizacion)
 

@@ -44,6 +44,8 @@ def obtener_atenciones_hospitalizacion(
     fecha_inicio: datetime | None = Query(None, title="Fecha inicial de atención"),
     fecha_fin: datetime | None = Query(None, title="Fecha final de atención"),
     id_diagnostico: int | None = Query(None, title="ID diagnóstico"),
+    pag: int = 1,
+    cantidad: int = 30,
     service = Depends(getHospitalizacionesService)
 ):
     result = service.get_atenciones_por_hospitalizacion(
@@ -52,7 +54,9 @@ def obtener_atenciones_hospitalizacion(
         id_doctor=id_doctor,
         fecha_inicio=fecha_inicio,
         fecha_fin=fecha_fin,
-        id_diagnostico=id_diagnostico
+        id_diagnostico=id_diagnostico,
+        pag=pag,
+        cantidad=cantidad
     )
     if result.hasError:
         return result.toHttpResponse(status.HTTP_400_BAD_REQUEST)

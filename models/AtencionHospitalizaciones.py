@@ -20,7 +20,7 @@ class AtencionHospitalizaciones(Base):
 
     @property
     def nombre_enfermedad(self):
-        return self.diagnostico.nombre_diagnostico if self.diagnostico else None
+        return self.diagnostico.nombre_enfermedad if self.diagnostico else None
 
     def __repr__(self):
         return (f"AtencionHospitalizaciones(id_atencionh={self.id_atencionh}, id_doctor={self.id_doctor}, "
