@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.logger import setup_logging, get_logger
+from routers import HospitalizacionesRouter
 
 app = FastAPI(
     title="EPS API 2",
@@ -42,3 +43,4 @@ def root():
     return {
         "message": "ok"
     }
+app.include_router(HospitalizacionesRouter.router, prefix="/api")
