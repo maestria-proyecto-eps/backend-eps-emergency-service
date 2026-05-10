@@ -15,6 +15,7 @@ class Hospitalizaciones(Base):
     id_urgencia = Column(Integer, ForeignKey('atencion_urgencias.id_urgencia'), nullable=False)
 
     urgencia = relationship('AtencionUrgencias', back_populates='hospitalizaciones')
+    atencion_hospitalizaciones = relationship('AtencionHospitalizaciones', back_populates='hospitalizacion')
 
     def __repr__(self):
         return (f"Hospitalizaciones(id_hospitalizacion={self.id_hospitalizacion}, "
