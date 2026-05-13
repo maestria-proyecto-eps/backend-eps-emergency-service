@@ -12,6 +12,8 @@ from models.Hospitalizaciones import Hospitalizaciones
 from models.Doctor import Doctor
 from models.CatalogoDiagnosticos import CatalogoDiagnosticos
 from models.AtencionHospitalizaciones import AtencionHospitalizaciones
+from models.Triages import Triages
+from models.Persona import Persona
 
 SQLALCHEMY_DATABASE_URL = "sqlite://"
 
@@ -109,7 +111,23 @@ def borrar_hospitalizaciones():
     db = TestingSessionLocal()
     db.query(Hospitalizaciones).delete()
     db.commit()
-    
+
+@pytest.fixture()
+def db_session():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@pytest.fixture()
+def db_admin_session():
+    db = TestingSessionLocalAdmin()
+    try:
+        yield db
+    finally:
+        db.close()
+
 @pytest.fixture()
 def client():
     return TestClient(app)
