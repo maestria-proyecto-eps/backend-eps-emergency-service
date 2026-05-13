@@ -17,13 +17,8 @@ class AtencionUrgenciasRepository:
         )
 
     def get_id_paciente_por_atencion_urgencia(self, idAtencionUrgencia: int) -> int | None:
-        atencion = (
-            self.db.query(AtencionUrgencias)
-            .options(joinedload(AtencionUrgencias.triage))
-            .filter(AtencionUrgencias.id_urgencia == idAtencionUrgencia)
-            .first()
-        )
-        if atencion:
+        atencion = self.db.query(AtencionUrgencias).options(joinedload(AtencionUrgencias.triage)).filter(AtencionUrgencias.id_urgencia == idAtencionUrgencia).first()
+        if atencion and atencion.triage:
             return atencion.triage.id_paciente
         return None
 

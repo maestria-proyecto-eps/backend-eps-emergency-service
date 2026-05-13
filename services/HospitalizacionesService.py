@@ -15,7 +15,8 @@ from services.repositories.DoctorRepository import DoctorRepository
 from services.repositories.DiagnosticoRepository import DiagnosticoRepository
 from services.repositories.HospitalizacionesRepository import HospitalizacionesRepository
 from schemas.response.GenericResponse import Response
-
+from schemas.request.HospitalizacionIngreso_updateRequest import HospitalizacionIngreso_updateRequest
+from schemas.response.HospitalizacionDetailResponse import HospitalizacionDetailResponse
 
 class HospitalizacionesService:
     def __init__(self, repo: HospitalizacionesRepository, repoUrgencias: AtencionUrgenciasRepository,
@@ -98,3 +99,74 @@ class HospitalizacionesService:
         self.repo.db.commit()
         self.repo.db.refresh(atencion)
         return Response.ok(AtencionHospitalziacionesResponse.model_validate(atencion), "Atención creada exitosamente")
+
+    def registrar_ingreso(self, id_hospitalizacion: int, request: HospitalizacionIngreso_updateRequest):
+        hosp = self.repo.get_hospitalizacion_por_id(id_hospitalizacion)
+        
+        if not hosp:
+            return Response.error("La hospitalización no existe")
+        if int(hosp.estado) != 0:
+            return Response.error("La hospitalización ya fue ingresada o dada de salida")
+
+        hosp.num_cama = request.num_cama
+        hosp.ingreso = datetime.datetime.now()
+        hosp.estado = 1
+        self.repo.db.commit()
+        self.repo.db.refresh(hosp)
+        return Response.ok(HospitalizacionResponse.model_validate(hosp), "Ingreso registrado exitosamente")
+
+
+    def registrar_salida(self, id_hospitalizacion: int):
+        hosp = self.repo.get_hospitalizacion_por_id(id_hospitalizacion)
+        if not hosp:
+            return Response.error("La hospitalización no existe")
+        if int(hosp.estado) != 1:
+            return Response.error("La hospitalización no está en estado ingresado")
+
+        hosp.salida = datetime.datetime.now()
+        hosp.estado = 2
+        self.repo.db.commit()
+        self.repo.db.refresh(hosp)
+        return Response.ok(HospitalizacionResponse.model_validate(hosp), "Salida registrada exitosamente")
+
+
+    def listar_hospitalizaciones(
+        self,
+        id_paciente: int | None,
+        num_cama: int | None,
+        estado: int | None,
+        fecha_ingreso_inicio,
+        fecha_ingreso_fin,
+        fecha_salida_inicio,
+        fecha_salida_fin,
+        pag: int,
+        cantidad: int
+    ):
+        data, count = self.repo.get_hospitalizaciones_filtrado(
+            id_paciente=id_paciente,
+            num_cama=num_cama,
+            estado=estado,
+            fecha_ingreso_inicio=fecha_ingreso_inicio,
+            fecha_ingreso_fin=fecha_ingreso_fin,
+            fecha_salida_inicio=fecha_salida_inicio,
+            fecha_salida_fin=fecha_salida_fin,
+            pag=pag,
+            cantidad=cantidad
+        )
+        totalPags = math.ceil(count / cantidad) if cantidad else 1
+        response = []
+        for hosp in data:
+            item = HospitalizacionDetailResponse.model_validate(hosp)
+            id_pac = self.repoUrgencias.get_id_paciente_por_atencion_urgencia(hosp.id_urgencia)
+            item.id_paciente = id_pac
+            if id_pac:
+                persona = self.repoPersona.get_persona_por_id(id_pac)
+                if persona:
+                    item.nombre_paciente = persona.nombres + " " + persona.apellidos
+            response.append(item)
+
+        return Response.ok(PaginatedResponse[HospitalizacionDetailResponse](
+            data=response,
+            page=pag,
+            pages=totalPags
+        ), "Listado de hospitalizaciones")
