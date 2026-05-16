@@ -1,7 +1,7 @@
 #Repositories
 from fastapi import Depends
 
-from db.session import get_db, get_db_admin
+from db.session import get_db_audit, get_db_admin_audit
 from services.HospitalizacionesService import HospitalizacionesService
 from services.repositories.AtencionHospitalizacionesRepository import AtencionHospitalizacionesRepository
 from services.repositories.DiagnosticoRepository import DiagnosticoRepository
@@ -13,19 +13,19 @@ from services.UrgenciasService import UrgenciasService
 from services.repositories.TriagesRepository import TriagesRepository
 
 #Repositories
-def getAtencionUrgenciasRepository(db = Depends(get_db))-> AtencionUrgenciasRepository:
+def getAtencionUrgenciasRepository(db = Depends(get_db_audit))-> AtencionUrgenciasRepository:
     return AtencionUrgenciasRepository(db)
-def getHospitalizacionesRepository(db = Depends(get_db))-> HospitalizacionesRepository:
+def getHospitalizacionesRepository(db = Depends(get_db_audit))-> HospitalizacionesRepository:
     return HospitalizacionesRepository(db)
-def getDiagnosticosRepository(db = Depends(get_db))-> DiagnosticoRepository:
+def getDiagnosticosRepository(db = Depends(get_db_audit))-> DiagnosticoRepository:
     return DiagnosticoRepository(db)
-def getDoctorRepository(db = Depends(get_db_admin))-> DoctorRepository:
+def getDoctorRepository(db = Depends(get_db_admin_audit))-> DoctorRepository:
     return DoctorRepository(db)
-def getAtencionHospitalizacionesRepository(db = Depends(get_db))-> AtencionHospitalizacionesRepository:
+def getAtencionHospitalizacionesRepository(db = Depends(get_db_audit))-> AtencionHospitalizacionesRepository:
     return AtencionHospitalizacionesRepository(db)
-def getPersonaRepository(db = Depends(get_db_admin))-> PersonaRepository:
+def getPersonaRepository(db = Depends(get_db_admin_audit))-> PersonaRepository:
     return PersonaRepository(db)
-def getTriagesRepository(db = Depends(get_db)) -> TriagesRepository:
+def getTriagesRepository(db = Depends(get_db_audit)) -> TriagesRepository:
     return TriagesRepository(db)
 #Services
 def getHospitalizacionesService(
