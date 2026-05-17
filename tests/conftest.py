@@ -15,24 +15,31 @@ from models.AtencionHospitalizaciones import AtencionHospitalizaciones
 from models.Triages import Triages
 from models.Persona import Persona
 
-# FIX: USUARIOS y ROLES ahora usan BaseAdmin — hay que importarlos para que
-# BaseAdmin.metadata los registre antes de create_all, de lo contrario
-# el FK usuarios.num_documento -> persona.num_documento no puede resolverse.
+# USUARIOS y ROLES usan BaseAdmin — importar para que BaseAdmin.metadata
+# los registre antes de create_all y el FK usuarios->persona se resuelva.
 from models.user import USUARIOS, ROLES  # noqa: F401
 
-SQLALCHEMY_DATABASE_URL = "sqlite://"
+from core.dependencias import get_usuario_actual
 
+# ---------------------------------------------------------------------------
+# Engines SQLite en memoria
+# ---------------------------------------------------------------------------
+
+SQLALCHEMY_DATABASE_URL = "sqlite://"
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-TestingSessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine,
+SQLALCHEMY_DATABASE_URL_ADMIN = "sqlite://"
+engine_admin = create_engine(
+    SQLALCHEMY_DATABASE_URL_ADMIN,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
+TestingSessionLocalAdmin = sessionmaker(autocommit=False, autoflush=False, bind=engine_admin)
 
 
 def override_get_db():
@@ -43,22 +50,6 @@ def override_get_db():
         db.close()
 
 
-# Configuración DB admin
-SQLALCHEMY_DATABASE_URL_ADMIN = "sqlite://"
-
-engine_admin = create_engine(
-    SQLALCHEMY_DATABASE_URL_ADMIN,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-
-TestingSessionLocalAdmin = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine_admin,
-)
-
-
 def override_get_db_admin():
     db = TestingSessionLocalAdmin()
     try:
@@ -67,18 +58,44 @@ def override_get_db_admin():
         db.close()
 
 
+# ---------------------------------------------------------------------------
+# Helpers para mocks de usuario
+# ---------------------------------------------------------------------------
+
+def make_mock_usuario(rol_nombre: str) -> USUARIOS:
+    """Construye un USUARIOS en memoria con su rol ya cargado."""
+    rol = ROLES(id_rol=1, nombre_rol=rol_nombre)
+    user = USUARIOS(
+        id_usuario=1,
+        num_documento=999999999,
+        password="x",
+        id_rol=1,
+        estado=True,
+        intentos_login=0,
+    )
+    user.rol = rol
+    return user
+
+
+# ---------------------------------------------------------------------------
+# Fixtures de sesión
+# ---------------------------------------------------------------------------
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
-    # Base (DB operativa): AtencionUrgencias, Hospitalizaciones, Triages,
-    #                       CatalogoDiagnosticos, AtencionHospitalizaciones
     Base.metadata.create_all(bind=engine)
-
-    # BaseAdmin (DB administrativa): Persona, USUARIOS, ROLES, Doctor
-    # Todos deben estar importados arriba para que metadata los conozca.
     BaseAdmin.metadata.create_all(bind=engine_admin)
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_db_admin] = override_get_db_admin
+
+    # Override global de get_usuario_actual — usa "Médico" como rol base
+    # (cubre la mayoría de endpoints; los que necesitan "Enfermero" lo
+    # sobreescriben por test usando app.dependency_overrides directamente,
+    # pero como autouse=session esto cubre todos los tests sin tocarlos).
+    # Se usa "Administrador" para que pase cualquier RequireRole sin importar
+    # el rol específico requerido.
+    app.dependency_overrides[get_usuario_actual] = lambda: make_mock_usuario("Administrador")
 
     yield
 
@@ -86,6 +103,10 @@ def setup_test_db():
     BaseAdmin.metadata.drop_all(bind=engine_admin)
     app.dependency_overrides.clear()
 
+
+# ---------------------------------------------------------------------------
+# Fixtures de datos
+# ---------------------------------------------------------------------------
 
 @pytest.fixture
 def crear_urgencia():
