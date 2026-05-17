@@ -11,7 +11,7 @@ from schemas.response.GenericPaginatedResponse import PaginatedResponse
 from schemas.response.GenericResponse import Response
 from schemas.response.TriageResponse import TriageResponse
 from services.UrgenciasService import UrgenciasService
-
+from core.dependencias import RequireRole
 
 router = APIRouter(
     prefix="",
@@ -19,7 +19,7 @@ router = APIRouter(
 )
 
 
-@router.post("/triages", response_model=Response[TriageResponse])
+@router.post("/triages", response_model=Response[TriageResponse], dependencies=[Depends(RequireRole(["Enfermero"]))])
 def crear_triage(
     data: TriageCreateRequest,
     service: UrgenciasService = Depends(getUrgenciasService)
@@ -30,7 +30,7 @@ def crear_triage(
     return result.toHttpResponse(status.HTTP_201_CREATED)
 
 
-@router.get("/triages", response_model=Response[PaginatedResponse[TriageResponse]])
+@router.get("/triages", response_model=Response[PaginatedResponse[TriageResponse]], dependencies=[Depends(RequireRole(["Enfermero"]))])
 def listar_triages(
     id_paciente: int | None = Query(None),
     nivel: int | None = Query(None),
@@ -57,7 +57,7 @@ def listar_triages(
     return result.toHttpResponse(status.HTTP_200_OK)
 
 
-@router.get("/triages/urgencia/first", response_model=Response[TriageResponse])
+@router.get("/triages/urgencia/first", response_model=Response[TriageResponse], dependencies=[Depends(RequireRole(["Médico"]))])
 def obtener_primer_triage_pendiente(
     service: UrgenciasService = Depends(getUrgenciasService)
 ):
@@ -67,7 +67,7 @@ def obtener_primer_triage_pendiente(
     return result.toHttpResponse(status.HTTP_200_OK)
 
 
-@router.put("/triages/atender/{id_triage}", response_model=Response[TriageResponse])
+@router.put("/triages/atender/{id_triage}", response_model=Response[TriageResponse], dependencies=[Depends(RequireRole(["Médico"]))])
 def atender_triage(
     id_triage: int,
     service: UrgenciasService = Depends(getUrgenciasService)
@@ -82,7 +82,7 @@ def atender_triage(
     return result.toHttpResponse(status.HTTP_200_OK)
 
 
-@router.post("/atencion_urgencias", response_model=Response[AtencionUrgenciasResponse])
+@router.post("/atencion_urgencias", response_model=Response[AtencionUrgenciasResponse], dependencies=[Depends(RequireRole(["Médico"]))])
 def crear_atencion_urgencias(
     data: AtencionUrgenciasCreateRequest,
     service: UrgenciasService = Depends(getUrgenciasService)
@@ -93,7 +93,7 @@ def crear_atencion_urgencias(
     return result.toHttpResponse(status.HTTP_201_CREATED)
 
 
-@router.get("/atencion_urgencias", response_model=Response[PaginatedResponse[AtencionUrgenciasResponse]])
+@router.get("/atencion_urgencias", response_model=Response[PaginatedResponse[AtencionUrgenciasResponse]], dependencies=[Depends(RequireRole(["Médico"]))])
 def listar_atenciones_urgencias(
     id_doctor: int | None = Query(None),
     id_paciente: int | None = Query(None),

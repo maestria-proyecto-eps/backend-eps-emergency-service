@@ -12,13 +12,14 @@ from schemas.response.HospitalizacionResponse import HospitalizacionResponse
 from schemas.request.HospitalizacionIngreso_updateRequest import HospitalizacionIngreso_updateRequest
 from schemas.response.HospitalizacionDetailResponse import HospitalizacionDetailResponse
 from schemas.response.GenericPaginatedResponse import PaginatedResponse
+from core.dependencias import RequireRole
 
 router = APIRouter(
     prefix="/hospitalizacion",
     tags=["Hospitalziacion"],
 )
 
-@router.post("/", response_model=Response[HospitalizacionResponse])
+@router.post("/", response_model=Response[HospitalizacionResponse], dependencies=[Depends(RequireRole(["Médico"]))])
 def crear_hospitalizacion(
     data:Hospitalizacion_createRequest,
     service = Depends(getHospitalizacionesService)
@@ -27,7 +28,7 @@ def crear_hospitalizacion(
     if result.hasError:
         return result.toHttpResponse(status.HTTP_400_BAD_REQUEST)
     return result.toHttpResponse(status.HTTP_201_CREATED)
-@router.post("/atencion", response_model=Response[AtencionHospitalziacionesResponse])
+@router.post("/atencion", response_model=Response[AtencionHospitalziacionesResponse], dependencies=[Depends(RequireRole(["Médico"]))])
 def crear_atencion_hospitalizacion(
     data:AtencionHospitalizaciones_createRequest,
     service = Depends(getHospitalizacionesService)
@@ -38,7 +39,7 @@ def crear_atencion_hospitalizacion(
     return result.toHttpResponse(status.HTTP_201_CREATED)
 
 
-@router.get("/atencion/{id_hospitalizacion}", response_model=Response[list[AtencionHospitalziacionesDetailResponse]])
+@router.get("/atencion/{id_hospitalizacion}", response_model=Response[list[AtencionHospitalziacionesDetailResponse]], dependencies=[Depends(RequireRole(["Médico"]))])
 def obtener_atenciones_hospitalizacion(
     id_hospitalizacion: int,
     id_paciente: int | None = Query(None, title="ID paciente", description="Filtro por id_paciente del triage"),
@@ -66,7 +67,7 @@ def obtener_atenciones_hospitalizacion(
 
 
 
-@router.put("/ingreso/{id_hospitalizacion}", response_model=Response[HospitalizacionResponse])
+@router.put("/ingreso/{id_hospitalizacion}", response_model=Response[HospitalizacionResponse], dependencies=[Depends(RequireRole(["Enfermero"]))])
 def registrar_ingreso_hospitalizacion(
     id_hospitalizacion: int,
     data: HospitalizacionIngreso_updateRequest,
@@ -78,7 +79,7 @@ def registrar_ingreso_hospitalizacion(
     return result.toHttpResponse(status.HTTP_200_OK)
 
 
-@router.put("/salida/{id_hospitalizacion}", response_model=Response[HospitalizacionResponse])
+@router.put("/salida/{id_hospitalizacion}", response_model=Response[HospitalizacionResponse], dependencies=[Depends(RequireRole(["Enfermero"]))])
 def registrar_salida_hospitalizacion(
     id_hospitalizacion: int,
     service = Depends(getHospitalizacionesService)
@@ -89,7 +90,7 @@ def registrar_salida_hospitalizacion(
     return result.toHttpResponse(status.HTTP_200_OK)
 
 
-@router.get("/", response_model=Response[PaginatedResponse[HospitalizacionDetailResponse]])
+@router.get("/", response_model=Response[PaginatedResponse[HospitalizacionDetailResponse]], dependencies=[Depends(RequireRole(["Enfermero", "Médico"]))])
 def listar_hospitalizaciones(
     id_paciente: int | None = Query(None, description="Filtro por id_paciente del triage"),
     num_cama: int | None = Query(None, description="Filtro por número de cama"),
