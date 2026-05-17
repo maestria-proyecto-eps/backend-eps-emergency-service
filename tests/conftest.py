@@ -15,6 +15,11 @@ from models.AtencionHospitalizaciones import AtencionHospitalizaciones
 from models.Triages import Triages
 from models.Persona import Persona
 
+# FIX: USUARIOS y ROLES ahora usan BaseAdmin — hay que importarlos para que
+# BaseAdmin.metadata los registre antes de create_all, de lo contrario
+# el FK usuarios.num_documento -> persona.num_documento no puede resolverse.
+from models.user import USUARIOS, ROLES  # noqa: F401
+
 SQLALCHEMY_DATABASE_URL = "sqlite://"
 
 engine = create_engine(
@@ -26,8 +31,9 @@ engine = create_engine(
 TestingSessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
-    bind=engine
+    bind=engine,
 )
+
 
 def override_get_db():
     db = TestingSessionLocal()
@@ -36,18 +42,22 @@ def override_get_db():
     finally:
         db.close()
 
-# Configuración DB2 (admin)
+
+# Configuración DB admin
 SQLALCHEMY_DATABASE_URL_ADMIN = "sqlite://"
+
 engine_admin = create_engine(
     SQLALCHEMY_DATABASE_URL_ADMIN,
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
+
 TestingSessionLocalAdmin = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine_admin,
 )
+
 
 def override_get_db_admin():
     db = TestingSessionLocalAdmin()
@@ -56,18 +66,26 @@ def override_get_db_admin():
     finally:
         db.close()
 
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
+    # Base (DB operativa): AtencionUrgencias, Hospitalizaciones, Triages,
+    #                       CatalogoDiagnosticos, AtencionHospitalizaciones
     Base.metadata.create_all(bind=engine)
-    app.dependency_overrides[get_db] = override_get_db
+
+    # BaseAdmin (DB administrativa): Persona, USUARIOS, ROLES, Doctor
+    # Todos deben estar importados arriba para que metadata los conozca.
     BaseAdmin.metadata.create_all(bind=engine_admin)
+
+    app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_db_admin] = override_get_db_admin
 
     yield
+
     Base.metadata.drop_all(bind=engine)
     BaseAdmin.metadata.drop_all(bind=engine_admin)
-
     app.dependency_overrides.clear()
+
 
 @pytest.fixture
 def crear_urgencia():
@@ -80,13 +98,14 @@ def crear_urgencia():
             observaciones="Paciente con dolor abdominal",
             tratamiento="Administrar analgésicos",
             id_triage=1,
-            id_diagnostico=1
+            id_diagnostico=1,
         )
         db.add(urgencia)
         db.commit()
         db.refresh(urgencia)
     yield urgencia
     db.close()
+
 
 @pytest.fixture
 def crear_hospitalizacion():
@@ -98,19 +117,21 @@ def crear_hospitalizacion():
             ingreso=datetime.datetime(2024, 6, 1, 10, 0),
             salida=None,
             estado=0,
-            id_urgencia=50
+            id_urgencia=50,
         )
         db.add(hospitalizacion)
         db.commit()
         db.refresh(hospitalizacion)
     yield hospitalizacion
     db.close()
-    
+
+
 @pytest.fixture()
 def borrar_hospitalizaciones():
     db = TestingSessionLocal()
     db.query(Hospitalizaciones).delete()
     db.commit()
+
 
 @pytest.fixture()
 def db_session():
@@ -120,6 +141,7 @@ def db_session():
     finally:
         db.close()
 
+
 @pytest.fixture()
 def db_admin_session():
     db = TestingSessionLocalAdmin()
@@ -128,9 +150,11 @@ def db_admin_session():
     finally:
         db.close()
 
+
 @pytest.fixture()
 def client():
     return TestClient(app)
+
 
 @pytest.fixture
 def crear_doctor():
@@ -140,13 +164,14 @@ def crear_doctor():
         doctor = Doctor(
             id_medico=12345,
             num_licencia=123456,
-            id_especialidad=1
+            id_especialidad=1,
         )
         db.add(doctor)
         db.commit()
         db.refresh(doctor)
     yield doctor
     db.close()
+
 
 @pytest.fixture
 def crear_diagnostico():
@@ -155,7 +180,7 @@ def crear_diagnostico():
     if not diagnostico:
         diagnostico = CatalogoDiagnosticos(
             id_diagnostico=1,
-            nombre_enfermedad="Gripe"
+            nombre_enfermedad="Gripe",
         )
         db.add(diagnostico)
         db.commit()
@@ -163,12 +188,13 @@ def crear_diagnostico():
     yield diagnostico
     db.close()
 
+
 @pytest.fixture
 def crear_atencion_hospitalizacion(crear_hospitalizacion, crear_doctor, crear_diagnostico):
     db = TestingSessionLocal()
     atencion = db.query(AtencionHospitalizaciones).filter(
         AtencionHospitalizaciones.id_hospitalizacion == crear_hospitalizacion.id_hospitalizacion,
-        AtencionHospitalizaciones.id_doctor == 12345
+        AtencionHospitalizaciones.id_doctor == 12345,
     ).first()
     if not atencion:
         atencion = AtencionHospitalizaciones(
@@ -177,7 +203,7 @@ def crear_atencion_hospitalizacion(crear_hospitalizacion, crear_doctor, crear_di
             id_diagnostico=1,
             id_hospitalizacion=crear_hospitalizacion.id_hospitalizacion,
             observaciones="Observaciones de prueba",
-            tratamiento="Tratamiento de prueba"
+            tratamiento="Tratamiento de prueba",
         )
         db.add(atencion)
         db.commit()

@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, BigInteger, ForeignKey, Boolean, TIMESTAMP, SmallInteger
 from sqlalchemy.orm import relationship, declarative_base
-from db.session import Base
+from db.session import BaseAdmin
 
-class USUARIOS(Base):
+class USUARIOS(BaseAdmin):
     __tablename__ = "usuarios"
     id_usuario = Column(Integer, primary_key=True, autoincrement=True) #PK
     password = Column(String(60), nullable=False)
@@ -15,7 +15,7 @@ class USUARIOS(Base):
     # Relaciones
     rol = relationship("ROLES")
 
-class ROLES(Base):
+class ROLES(BaseAdmin):
     __tablename__ = "roles"
     id_rol = Column(Integer, primary_key=True, index=True) #PK
     nombre_rol = Column(String(50), nullable=False, unique=True)
