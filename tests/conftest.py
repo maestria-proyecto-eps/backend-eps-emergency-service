@@ -20,7 +20,6 @@ from models.Persona import Persona
 from models.user import USUARIOS, ROLES  # noqa: F401
 
 from core.dependencias import get_usuario_actual
-from core.auth_utils import get_current_user_id  # ← NUEVO: cortar la cadena HTTPBearer
 
 # ---------------------------------------------------------------------------
 # Engines SQLite en memoria
@@ -90,19 +89,12 @@ def setup_test_db():
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_db_admin] = override_get_db_admin
 
-    # ── CORRECCIÓN CLAVE ────────────────────────────────────────────────────
-    # HTTPBearer lanza 401 cuando no hay header Authorization, incluso antes
-    # de que el override de get_usuario_actual tenga efecto, porque FastAPI
-    # resuelve el árbol de dependencias completo:
-    #   RequireRole → get_usuario_actual → get_current_user_id → HTTPBearer → 401
-    #
-    # Solución: cortar la cadena en la raíz sobreescribiendo get_current_user_id
-    # para que devuelva un user_id ficticio sin tocar el token.
-    app.dependency_overrides[get_current_user_id] = lambda: 1  # ← NUEVO
-
-    # get_usuario_actual también se overridea para evitar la consulta a BD
-    # y devolver directamente el usuario mock con rol "Administrador"
-    # (pasa cualquier RequireRole gracias a la lógica `!= "Administrador"` del guard).
+    # Override global de get_usuario_actual — usa "Médico" como rol base
+    # (cubre la mayoría de endpoints; los que necesitan "Enfermero" lo
+    # sobreescriben por test usando app.dependency_overrides directamente,
+    # pero como autouse=session esto cubre todos los tests sin tocarlos).
+    # Se usa "Administrador" para que pase cualquier RequireRole sin importar
+    # el rol específico requerido.
     app.dependency_overrides[get_usuario_actual] = lambda: make_mock_usuario("Administrador")
 
     yield
