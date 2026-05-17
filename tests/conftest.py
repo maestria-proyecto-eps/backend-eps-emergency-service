@@ -1,51 +1,63 @@
 import datetime
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import StaticPool, create_engine
 from sqlalchemy.orm import sessionmaker
-import pytest
 
-from db.session import Base, BaseAdmin, get_db, get_db_admin
+# ── App y BD ────────────────────────────────────────────────────────────────
 from main import app
+from db.session import (
+    Base, BaseAdmin,
+    get_db, get_db_admin,
+    get_db_audit, get_db_admin_audit,
+)
+
+# ── Auth — se overridea get_current_user_id para cortar HTTPBearer ──────────
+# Los routers importan RequireRole de core.dependencias, que llama a
+# get_usuario_actual, que llama a get_current_user_id (core.auth_utils),
+# que llama a HTTPBearer.  Sin Authorization header → 401 inmediato.
+# Overridear get_current_user_id es la única forma de cortarlo en la raíz.
+from core.auth_utils import get_current_user_id
+from core.dependencias import get_usuario_actual
+
+# ── Modelos ──────────────────────────────────────────────────────────────────
+from models.user import USUARIOS, ROLES          # noqa: F401  (registra en BaseAdmin)
 from models.AtencionUrgencias import AtencionUrgencias
 from models.Hospitalizaciones import Hospitalizaciones
 from models.Doctor import Doctor
 from models.CatalogoDiagnosticos import CatalogoDiagnosticos
 from models.AtencionHospitalizaciones import AtencionHospitalizaciones
 from models.Triages import Triages
-from models.Persona import Persona
+from models.Persona import Persona              # noqa: F401  (registra en Base)
 
-# USUARIOS y ROLES usan BaseAdmin — importar para que BaseAdmin.metadata
-# los registre antes de create_all y el FK usuarios->persona se resuelva.
-from models.user import USUARIOS, ROLES  # noqa: F401
+# ── Engines SQLite en memoria ────────────────────────────────────────────────
 
-from core.dependencias import get_usuario_actual
-
-# ---------------------------------------------------------------------------
-# Engines SQLite en memoria
-# ---------------------------------------------------------------------------
-
-SQLALCHEMY_DATABASE_URL = "sqlite://"
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
+    "sqlite://",
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-SQLALCHEMY_DATABASE_URL_ADMIN = "sqlite://"
 engine_admin = create_engine(
-    SQLALCHEMY_DATABASE_URL_ADMIN,
+    "sqlite://",
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
 TestingSessionLocalAdmin = sessionmaker(autocommit=False, autoflush=False, bind=engine_admin)
 
 
+# ── Overrides de BD ──────────────────────────────────────────────────────────
+
 def override_get_db():
     db = TestingSessionLocal()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -54,13 +66,44 @@ def override_get_db_admin():
     db = TestingSessionLocalAdmin()
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
 
-# ---------------------------------------------------------------------------
-# Helpers para mocks de usuario
-# ---------------------------------------------------------------------------
+def override_get_db_audit():
+    """
+    get_db_audit ejecuta SET LOCAL my.app_user_id en Postgres → falla en CI.
+    Se reemplaza por una sesión SQLite sin auditoría.
+    """
+    db = TestingSessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def override_get_db_admin_audit():
+    """Ídem para get_db_admin_audit."""
+    db = TestingSessionLocalAdmin()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+# ── Mock de usuario ──────────────────────────────────────────────────────────
 
 def make_mock_usuario(rol_nombre: str) -> USUARIOS:
     """Construye un USUARIOS en memoria con su rol ya cargado."""
@@ -77,36 +120,75 @@ def make_mock_usuario(rol_nombre: str) -> USUARIOS:
     return user
 
 
-# ---------------------------------------------------------------------------
-# Fixtures de sesión
-# ---------------------------------------------------------------------------
+# ── Setup global de BD y overrides (scope=session) ──────────────────────────
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
+    # Crear tablas en SQLite
     Base.metadata.create_all(bind=engine)
     BaseAdmin.metadata.create_all(bind=engine_admin)
 
+    # ── Overrides de sesión BD ──────────────────────────────────────────────
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_db_admin] = override_get_db_admin
+    app.dependency_overrides[get_db_audit] = override_get_db_audit
+    app.dependency_overrides[get_db_admin_audit] = override_get_db_admin_audit
 
-    # Override global de get_usuario_actual — usa "Médico" como rol base
-    # (cubre la mayoría de endpoints; los que necesitan "Enfermero" lo
-    # sobreescriben por test usando app.dependency_overrides directamente,
-    # pero como autouse=session esto cubre todos los tests sin tocarlos).
-    # Se usa "Administrador" para que pase cualquier RequireRole sin importar
-    # el rol específico requerido.
+    # ── Override de autenticación ───────────────────────────────────────────
+    # 1) Cortamos HTTPBearer en la raíz: get_current_user_id devuelve 1
+    #    sin validar ningún token.
+    app.dependency_overrides[get_current_user_id] = lambda: 1
+
+    # 2) get_usuario_actual devuelve un usuario mock con rol "Administrador",
+    #    lo que hace que RequireRole acepte cualquier endpoint (la condición
+    #    en core/dependencias.py es `rol != "Administrador"` para denegar).
     app.dependency_overrides[get_usuario_actual] = lambda: make_mock_usuario("Administrador")
 
     yield
 
+    # Teardown
     Base.metadata.drop_all(bind=engine)
     BaseAdmin.metadata.drop_all(bind=engine_admin)
     app.dependency_overrides.clear()
 
 
-# ---------------------------------------------------------------------------
-# Fixtures de datos
-# ---------------------------------------------------------------------------
+# ── Fixture de cliente ───────────────────────────────────────────────────────
+
+@pytest.fixture()
+def client():
+    return TestClient(app)
+
+
+# ── Fixtures de sesión directa ───────────────────────────────────────────────
+
+@pytest.fixture()
+def db_session():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@pytest.fixture()
+def db_admin_session():
+    db = TestingSessionLocalAdmin()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# ── Fixtures de datos ────────────────────────────────────────────────────────
+
+@pytest.fixture()
+def borrar_hospitalizaciones():
+    db = TestingSessionLocal()
+    db.query(AtencionHospitalizaciones).delete()
+    db.query(Hospitalizaciones).delete()
+    db.commit()
+    db.close()
+
 
 @pytest.fixture
 def crear_urgencia():
@@ -145,36 +227,6 @@ def crear_hospitalizacion():
         db.refresh(hospitalizacion)
     yield hospitalizacion
     db.close()
-
-
-@pytest.fixture()
-def borrar_hospitalizaciones():
-    db = TestingSessionLocal()
-    db.query(Hospitalizaciones).delete()
-    db.commit()
-
-
-@pytest.fixture()
-def db_session():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-@pytest.fixture()
-def db_admin_session():
-    db = TestingSessionLocalAdmin()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-@pytest.fixture()
-def client():
-    return TestClient(app)
 
 
 @pytest.fixture
