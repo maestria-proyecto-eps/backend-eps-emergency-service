@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from models.Hospitalizaciones import Hospitalizaciones
 from datetime import datetime
 from models.AtencionUrgencias import AtencionUrgencias
+from models.Triages import Triages
 
 class HospitalizacionesRepository:
     def __init__(self, db: Session):
@@ -51,9 +52,11 @@ class HospitalizacionesRepository:
         # Filtro por id_paciente: viene del triage/urgencia
         if id_paciente is not None:
             query = query.join(
-                Hospitalizaciones.urgencia
+                Hospitalizaciones.urgencia        # Hospitalizaciones → AtencionUrgencias
+            ).join(
+                AtencionUrgencias.triage          # AtencionUrgencias → Triages
             ).filter(
-                AtencionUrgencias.id_paciente == id_paciente
+                Triages.id_paciente == id_paciente
             )
 
         count = query.count()
